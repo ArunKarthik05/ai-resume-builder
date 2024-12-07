@@ -47,9 +47,3 @@ async def generate_resume(job_details: JobDetails):
         return {"generated_resume": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating resume: {str(e)}")
-
-
-@app.post("/test")
-def post(name: Name):
-    print(name.dict())
-    return name
