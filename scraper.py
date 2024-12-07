@@ -34,7 +34,7 @@ def job_scrapper(skill: str, location: str, pages: int, experience: int):
         soup = BeautifulSoup(response.text, 'html.parser')
 
         # Find all job cards on the page
-        job_cards = soup.find_all('li', class_="clearfix job-bx wht-shd-bx")
+        job_cards = soup.find_all('li', class_="clearfix job-bx wht-shd-bx")[:10]
 
         for job in job_cards:  # Process only the first 10 jobs on the page
             header = job.find('h2', class_='heading-trun')
@@ -50,14 +50,14 @@ def job_scrapper(skill: str, location: str, pages: int, experience: int):
             
             detailed_info = get_apply_link_details(link)
             jobs.append({
-                "Job Title": title,
-                "Company": company,
-                "Summary": summary,
-                "Location": location,
-                "Experience": experience,
-                "Salary": salary,
-                "Link": link if link else "N/A",
-                "Detailed Info" : detailed_info
+                "job_title": title,
+                "company": company,
+                "summary": summary,
+                "location": location,
+                "experience": experience,
+                "salary": salary,
+                "link": link if link else "N/A",
+                "detailed_info" : detailed_info
             })
             pageNo += 1
 
@@ -91,7 +91,11 @@ def get_apply_link_details(link: str):
             label = item.find('label')
             detail = item.find('span', class_='basic-info-dtl')
             if label and detail:
-                key_details_dict[label.get_text(strip=True)] = detail.get_text(strip=True)
+                key = label.get_text(strip=True)
+                # Remove colon at the end of the key if present
+                if key.endswith(":"):
+                    key = key[:-1]
+                key_details_dict[key] = detail.get_text(strip=True)
     
     # Extract Key Skills
     skills = soup.find('div', class_='jd-sec job-skills clearfix')
@@ -109,12 +113,11 @@ def get_apply_link_details(link: str):
         if company_name_tag:
             company_name = company_name_tag.get_text(strip=True)
     
-    # Returning the extracted details
     return {
-        'Job Description': job_description_text,
-        'Key Details': key_details_dict,
-        'Skills': skills_list,
-        'Job Posted By': company_name
+    'job_description': job_description_text,
+    'key_details': key_details_dict,
+    'skills': skills_list,
+    'job_posted_by': company_name
     }
 
 
