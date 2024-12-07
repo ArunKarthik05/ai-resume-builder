@@ -4,4 +4,4 @@ fastapi
 beautifulsoup4
 python-dotenv
 google-generativeai
-uvicorn
+uvicorn[standard]
