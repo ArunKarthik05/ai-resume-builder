@@ -1,7 +1,7 @@
-requests
+requests==2.32.3
 pydantic
-fastapi
-beautifulsoup4
+fastapi==0.115.6
+beautifulsoup4==4.12.3
 python-dotenv
 google-generativeai
-uvicorn[standard]
+uvicorn==0.32.1
