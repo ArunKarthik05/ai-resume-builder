@@ -2,13 +2,20 @@ from fastapi import FastAPI, Query, HTTPException
 from pydantic import BaseModel
 from scraper import job_scrapper  
 from gemini import resume_generator
-from models import JobDetails  
+from models import JobDetails 
+from fastapi.middleware.cors import CORSMiddleware
 import json
 
+allowed_origins = ["https://genresume-ai.vercel.app","localhost"]
 app = FastAPI()
 
-class Name(BaseModel):
-    name : str
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,  # List of allowed origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
 
 @app.get("/")
 def read_root():
