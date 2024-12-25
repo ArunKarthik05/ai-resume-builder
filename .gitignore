@@ -3,4 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 my_venv/
+.venv/
+test/
 .env
