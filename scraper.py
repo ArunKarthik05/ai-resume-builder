@@ -85,7 +85,7 @@ async def extract_jobs_from_linkedin(page, context, target_url):
     # job_cards = soup.select("div.job-card-container")
     print(f"Found {len(job_cards)} job cards on LinkedIn.")
 
-    # Extract job details
+    # Extract job detassils
     jobs = []
     for card in job_cards:
         title_tag = card.select_one(".job-card-container__link span[aria-hidden='true']")
