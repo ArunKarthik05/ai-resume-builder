@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Query, HTTPException
 from pydantic import BaseModel
-from scraper import job_scrapper  
+from scraper import job_scraper
 from gemini import resume_generator
 from models import JobDetails 
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,10 +9,11 @@ import json
 allowed_origins = ["https://genresume-ai.vercel.app","localhost"]
 app = FastAPI()
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,  # List of allowed origins
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
 )
@@ -24,22 +25,23 @@ def read_root():
 
 
 @app.get("/jobs")
-async def get_jobs(skill: str|None = Query(description="Skill to search for",default="React"),
-             location: str|None = Query(description="Location to search in",default="Chennai"),
-             pages: int|None = Query(description="Number of pages to scrape",default="1"),
-             experience : int|None = Query(description="Work Experience",default="1")
-             ):
+async def get_jobs(skill: str | None = Query(description="Skill to search for", default="React"),
+                   location: str | None = Query(description="Location to search in", default="Chennai"),
+                   experience: int | None = Query(description="Work Experience", default=1)):
     """
     API endpoint to scrape job listings.
     - skill: The skill or keyword to search for.
     - location: The location to search in.
-    - pages: Number of pages to scrape (10 jobs per page).
+    - experience: Years of work experience.
     """
     try:
-        job_listings = job_scrapper(skill=skill, location=location, pages=pages,experience=experience)
-        return {"total_jobs": len(job_listings), "jobs": job_listings}
+        job_listings = await job_scraper(skill=skill, location=location, experience=experience)
+        return {"total_jobs": len(job_listings["indeed"]) + len(job_listings["linkedin"]), 
+                "indeed_jobs": job_listings["indeed"], 
+                "linkedin_jobs": job_listings["linkedin"]}
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"Error scraping job listings: {str(e)}"}
+
 
 @app.post("/generate_resume")
 async def generate_resume(job_details: JobDetails):

@@ -1,124 +1,150 @@
-import requests
+from playwright.async_api import async_playwright
+from playwright_stealth import stealth_async
 from bs4 import BeautifulSoup
+import random
+import time
+import urllib.parse
 
-def job_scrapper(skill: str, location: str, pages: int, experience: int):
-    """
-    Scrapes TimesJobs for job listings based on skill, location, and experience.
-    - skill: The skill or keyword to search for.
-    - location: The location to search in.
-    - pages: Number of pages to scrape.
-    - experience: The experience filter (e.g., 0-3 years).
-    """
-    base_url = "https://www.timesjobs.com/candidate/job-search.html"
+
+async def simulate_human_behavior(page, min_time=2, max_time=4):
+    """Simulate human-like delays and scrolling."""
+    time.sleep(random.uniform(min_time, max_time))
+    for _ in range(random.randint(2, 6)):
+        await page.mouse.wheel(0, random.randint(300, 500))
+        time.sleep(random.uniform(min_time, max_time))
+
+
+async def extract_jobs_from_indeed(page, target_url):
+    """Extract job postings from Indeed."""
+    print(f"Navigating to Indeed URL: {target_url}")
+    await page.goto(target_url)
+    await simulate_human_behavior(page)
+
+    try:
+        await page.wait_for_selector(".job_seen_beacon", timeout=10000)
+    except Exception as e:
+        print(f"Error waiting for Indeed jobs to load: {e}")
+        return []
+
+    # Parse page content
+    page_content = await page.content()
+    soup = BeautifulSoup(page_content, 'html.parser')
+    job_cards = soup.select(".job_seen_beacon")
+    print(f"Found {len(job_cards)} job cards on Indeed.")
+
+    # Extract job details
     jobs = []
-    pageNo = 1
+    for card in job_cards:
+        title_tag = card.select_one("h2.jobTitle a")
+        company_tag = card.select_one("[data-testid='company-name']")
+        location_tag = card.select_one("[data-testid='text-location']")
 
-    for page in range(pages):
-        params = {
-            'searchType': 'personalizedSearch',
-            'from': 'submit',
-            'searchTextSrc': 'ft',
-            'txtKeywords': skill,
-            'txtLocation': location,
-            'cboWorkExp1': experience,
-            'postWeek' : 60,
-            'sequence': pageNo,
-            'startPage': 1
-        }
+        job_link = title_tag['href'] if title_tag else None
+        title = title_tag.get_text(strip=True) if title_tag else None
+        company = company_tag.get_text(strip=True) if company_tag else None
+        location = location_tag.get_text(strip=True) if location_tag else None
 
-        response = requests.get(base_url, params=params)
-        if response.status_code != 200:
-            print(f"Failed to fetch page {page + 1}: {response.status_code}")
-            continue
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-
-        # Find all job cards on the page
-        job_cards = soup.find_all('li', class_="clearfix job-bx wht-shd-bx")[:10]
-
-        for job in job_cards:  # Process only the first 10 jobs on the page
-            header = job.find('h2', class_='heading-trun')
-            title = header.find("a").text.strip() if header else "N/A"
-            link = header.find('a')['href'] if header else "N/A"
-            company = job.find('h3', class_='joblist-comp-name').text.strip() if job.find('h3', class_='joblist-comp-name') else "N/A"
-            summary = job.find('li', class_='job-description__').text.strip() if job.find('li', class_='job-description__') else "N/A"
-            
-            footer = job.find('ul', class_='top-jd-dtl mt-16 clearfix')
-            location = footer.find('li', class_='srp-zindex location-tru').text.strip() if footer and footer.find('li', class_='srp-zindex location-tru') else "N/A"
-            experience = footer.find_all('li')[1].text.strip() if footer and len(footer.find_all('li')) > 1 else "N/A"
-            salary = footer.find_all('li')[2].text.strip() if footer and len(footer.find_all('li')) > 2 else "N/A"
-            
-            detailed_info = get_apply_link_details(link)
+        if title or company or location:
             jobs.append({
-                "job_title": title,
+                "title": title,
                 "company": company,
-                "summary": summary,
                 "location": location,
-                "experience": experience,
-                "salary": salary,
-                "link": link if link else "N/A",
-                "detailed_info" : detailed_info
+                "job_link": f"https://www.indeed.com{job_link}" if job_link else None
             })
-            pageNo += 1
 
     return jobs
 
-import requests
-from bs4 import BeautifulSoup
 
-def get_apply_link_details(link: str):
-    response = requests.get(link)
-    
-    if response.status_code != 200:
-        print(f"Failed to fetch page: {response.status_code}")
-        return None
-    
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # Extract Job Description
-    job_description = soup.find('div', class_='jd-desc job-description-main')
-    if job_description:
-        job_description_text = job_description.get_text(strip=True)
-    else:
-        job_description_text = "Job description not available"
-    
-    # Extract Key Details
-    key_details = soup.find('div', class_='job-basic-info')
-    key_details_dict = {}
-    if key_details:
-        key_detail_items = key_details.find_all('li', class_='clearfix')
-        for item in key_detail_items:
-            label = item.find('label')
-            detail = item.find('span', class_='basic-info-dtl')
-            if label and detail:
-                key = label.get_text(strip=True)
-                # Remove colon at the end of the key if present
-                if key.endswith(":"):
-                    key = key[:-1]
-                key_details_dict[key] = detail.get_text(strip=True)
-    
-    # Extract Key Skills
-    skills = soup.find('div', class_='jd-sec job-skills clearfix')
-    skills_list = []
-    if skills:
-        skill_tags = skills.find_all('span', class_='jd-skill-tag')
-        for skill in skill_tags:
-            skills_list.append(skill.get_text(strip=True))
-    
-    # Extract Job Posted By
-    job_posted_by = soup.find('div', class_='jd-hiring-comp')
-    company_name = ""
-    if job_posted_by:
-        company_name_tag = job_posted_by.find('span', class_='basic-info-dtl')
-        if company_name_tag:
-            company_name = company_name_tag.get_text(strip=True)
-    
-    return {
-    'job_description': job_description_text,
-    'key_details': key_details_dict,
-    'skills': skills_list,
-    'job_posted_by': company_name
-    }
+async def extract_jobs_from_linkedin(page, context, target_url):
+    """Extract job postings from LinkedIn."""
+    print(f"Navigating to LinkedIn URL: {target_url}")
+    await page.goto(target_url)
+    await simulate_human_behavior(page)
+
+    # Check if login is required
+    sign_in_button = page.locator('a.nav__button-secondary:has-text("Sign in")')
+    if await sign_in_button.is_visible():
+        print("Login required. Proceeding to login...")
+        await sign_in_button.click()
+        await simulate_human_behavior(page)
+        await page.fill('input[name="session_key"]', "20tucs033@skct.edu.in")
+        await page.fill('input[name="session_password"]', "Dhamo@123")
+        await page.locator('button.btn__primary--large:has-text("Sign in")').click()
+        await simulate_human_behavior(page)
+
+    # Open a new tab for LinkedIn search
+    new_tab = await context.new_page()
+    await new_tab.goto(target_url)
+    await simulate_human_behavior(new_tab)
+
+    # Parse page content
+    page_content = await new_tab.content()
+    soup = BeautifulSoup(page_content, 'html.parser')
+    job_cards = soup.select("li.ember-view")
+    print(f"Found {len(job_cards)} job cards on LinkedIn.")
+
+    # Extract job details
+    jobs = []
+    for card in job_cards:
+        title_tag = card.select_one(".job-card-container__link span[aria-hidden='true']")
+        company_tag = card.select_one(".artdeco-entity-lockup__subtitle span")
+        location_tag = card.select_one(".artdeco-entity-lockup__subtitle span")
+
+        job_link = card.select_one(".job-card-container__link")['href'] if title_tag else None
+        title = title_tag.get_text(strip=True) if title_tag else None
+        company = company_tag.get_text(strip=True) if company_tag else None
+        location = location_tag.get_text(strip=True) if location_tag else None
+
+        if title or company or location:
+            jobs.append({
+                "title": title,
+                "company": company,
+                "location": location,
+                "job_link": f"https://www.linkedin.com{job_link}" if job_link else None
+            })
+
+    await new_tab.close()
+    return jobs
 
 
+async def job_scraper(skill: str, location: str, experience: int):
+    target_indeed_url = f"https://www.indeed.com/jobs?q={urllib.parse.quote(skill)}&l={urllib.parse.quote(location)}"
+    target_linkedin_url = f"https://www.linkedin.com/jobs/{urllib.parse.quote(skill)}-jobs-{urllib.parse.quote(location)}"
 
+    print(f"Skill: {skill}, Location: {location}, Experience: {experience}")
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=False,
+            args=["--disable-blink-features=AutomationControlled"]
+        )
+        context = await browser.new_context(
+            viewport={"width": random.randint(1024, 1920), "height": random.randint(768, 1080)},
+            user_agent=f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{random.randint(90, 130)}.0.0.0 Safari/537.36"
+        )
+        page = await context.new_page()
+        await stealth_async(page)
+
+        # Initialize job lists
+        indeed_jobs, linkedin_jobs = [], []
+
+        try:
+            # Extract jobs from Indeed
+            indeed_jobs = await extract_jobs_from_indeed(page, target_indeed_url)
+        except Exception as e:
+            print(f"Error scraping Indeed: {str(e)}")
+
+        try:
+            # Extract jobs from LinkedIn
+            linkedin_jobs = await extract_jobs_from_linkedin(page, context, target_linkedin_url)
+        except Exception as e:
+            print(f"Error scraping LinkedIn: {str(e)}")
+
+        # Close browser
+        await browser.close()
+
+        # Check if both failed
+        if not indeed_jobs and not linkedin_jobs:
+            raise Exception("Scraping failed for both sources.")
+
+        return {"indeed": indeed_jobs, "linkedin": linkedin_jobs}
