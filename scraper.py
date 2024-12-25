@@ -6,12 +6,13 @@ import time
 import urllib.parse
 
 
-async def simulate_human_behavior(page, min_time=2, max_time=4):
+async def simulate_human_behavior(page, min_time=1, max_time=2):
     """Simulate human-like delays and scrolling."""
     time.sleep(random.uniform(min_time, max_time))
     for _ in range(random.randint(2, 6)):
         await page.mouse.wheel(0, random.randint(300, 500))
         time.sleep(random.uniform(min_time, max_time))
+    print("Finsihed simulating human behaviour")
 
 
 async def extract_jobs_from_indeed(page, target_url):
@@ -76,11 +77,12 @@ async def extract_jobs_from_linkedin(page, context, target_url):
     new_tab = await context.new_page()
     await new_tab.goto(target_url)
     await simulate_human_behavior(new_tab)
-
     # Parse page content
     page_content = await new_tab.content()
+
     soup = BeautifulSoup(page_content, 'html.parser')
     job_cards = soup.select("li.ember-view")
+    # job_cards = soup.select("div.job-card-container")
     print(f"Found {len(job_cards)} job cards on LinkedIn.")
 
     # Extract job details
